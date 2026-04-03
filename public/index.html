@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ARBXBot — BingX Otomatik Arbitraj</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#07090c;--bg2:#0d1017;--bg3:#131720;--bg4:#1a2030;
+  --border:rgba(255,255,255,0.07);--bd2:rgba(255,255,255,0.13);
+  --text:#e2e6f3;--text2:#8892aa;--text3:#454e64;
+  --green:#00e676;--gdim:rgba(0,230,118,0.12);
+  --red:#ff4f4f;--rdim:rgba(255,79,79,0.12);
+  --blue:#3d8eff;
+  --cyan:#00e5ff;--cdim:rgba(0,229,255,0.1);
+  --amber:#ffab40;
+  --font-mono:'JetBrains Mono',monospace;
+  --font-sans:'Syne',sans-serif;
+  --r:8px;--rl:14px;
+}
+html{font-size:14px}
+body{background:var(--bg);color:var(--text);font-family:var(--font-mono);min-height:100vh}
+body::before{
+  content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:linear-gradient(var(--border) 1px,transparent 1px),
+                   linear-gradient(90deg,var(--border) 1px,transparent 1px);
+  background-size:48px 48px;
+  mask-image:radial-gradient(ellipse 80% 60% at 50% 0%,black,transparent 70%);
+}
+.wrap{max-width:1060px;margin:0 auto;padding:1.5rem 1rem;position:relative;z-index:1}
+
+/* HEADER */
+.hdr{display:flex;align-items:center;justify-content:space-between;
+     padding:1rem 1.5rem;background:var(--bg2);border:1px solid var(--border);
+     border-radius:var(--rl);margin-bottom:1.25rem}
+.logo{font-family:var(--font-sans);font-size:22px;font-weight:800;letter-spacing:-.5px}
+.logo span{color:var(--cyan)}
+.logo-sub{font-size:10px;color:var(--text3);font-weight:400;
+          letter-spacing:.1em;text-transform:uppercase;margin-left:8px}
+.pill{display:flex;align-items:center;gap:7px;padding:5px 14px;
+      background:var(--bg3);border:1px solid var(--border);
+      border-radius:20px;font-size:11px;color:var(--text3)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--text3);flex-shrink:0}
+.dot.on{background:var(--green);box-shadow:0 0 8px var(--green);animation:blink 1.5s infinite}
+.dot.err{background:var(--red)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+
+/* TABS */
+.tabs{display:flex;gap:3px;border-bottom:1px solid var(--border);margin-bottom:1.25rem;overflow-x:auto}
+.tab{padding:8px 18px;font-family:var(--font-mono);font-size:11px;font-weight:500;
+     letter-spacing:.07em;text-transform:uppercase;color:var(--text3);
+     border:none;border-bottom:2px solid transparent;background:transparent;
+     cursor:pointer;transition:all .15s;white-space:nowrap}
+.tab:hover{color:var(--text2)}.tab.on{color:var(--cyan);border-bottom-color:var(--cyan)}
+.panel{display:none}.panel.on{display:block}
+
+/* CARDS */
+.card{background:var(--bg2);border:1px solid var(--border);
+      border-radius:var(--rl);padding:1.25rem;margin-bottom:1rem}
+.card-title{font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+            color:var(--text3);margin-bottom:1rem;font-weight:500}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+@media(max-width:600px){.g2,.g3{grid-template-columns:1fr}}
+
+/* METRICS */
+.metric{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:.875rem 1rem}
+.mlbl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.09em;margin-bottom:5px}
+.mval{font-size:22px;font-weight:600;color:var(--text)}
+.mval.g{color:var(--green)}.mval.r{color:var(--red)}.mval.b{color:var(--blue)}.mval.a{color:var(--amber)}
+.msub{font-size:10px;color:var(--text3);margin-top:2px}
+
+/* FORM */
+.field{margin-bottom:12px}
+.field label{font-size:10px;text-transform:uppercase;letter-spacing:.08em;
+             color:var(--text3);display:block;margin-bottom:5px}
+input[type=text],input[type=password],input[type=number]{
+  width:100%;background:var(--bg);border:1px solid var(--bd2);
+  border-radius:var(--r);padding:9px 12px;
+  font-size:12px;font-family:var(--font-mono);color:var(--text);
+  outline:none;transition:border-color .15s}
+input:focus{border-color:var(--cyan)}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:7px;
+     padding:9px 20px;border-radius:var(--r);font-family:var(--font-mono);
+     font-size:12px;font-weight:500;cursor:pointer;
+     border:1px solid var(--bd2);background:var(--bg3);color:var(--text);
+     transition:all .15s;white-space:nowrap}
+.btn:hover{border-color:rgba(255,255,255,.2);background:var(--bg4)}
+.btn-go{background:var(--gdim);border-color:var(--green);color:var(--green)}
+.btn-go:hover{background:rgba(0,230,118,.22)}
+.btn-stop{background:var(--rdim);border-color:var(--red);color:var(--red)}
+.btn-stop:hover{background:rgba(255,79,79,.22)}
+.btn-cyan{background:var(--cdim);border-color:var(--cyan);color:var(--cyan)}
+.btn-sm{padding:5px 14px;font-size:11px}
+
+/* SLIDER */
+.sl-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.sl-lbl{font-size:11px;color:var(--text2);min-width:155px}
+.sl-val{font-family:var(--font-mono);font-size:12px;color:var(--cyan);min-width:64px;text-align:right}
+input[type=range]{flex:1;-webkit-appearance:none;height:3px;background:var(--bd2);border-radius:2px;outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
+  border-radius:50%;background:var(--cyan);border:2px solid var(--bg);cursor:pointer}
+
+/* TOGGLE */
+.tog-row{display:flex;align-items:center;justify-content:space-between;
+         padding:10px 0;border-top:1px solid var(--border)}
+.tog-lbl{font-size:12px;color:var(--text2)}
+.tog-sub{font-size:10px;color:var(--text3);margin-top:2px}
+.tog{width:38px;height:20px;background:var(--bd2);border-radius:10px;
+     position:relative;cursor:pointer;border:none;transition:background .2s;flex-shrink:0}
+.tog.on{background:var(--green)}
+.tog::after{content:'';position:absolute;top:2px;left:2px;
+  width:16px;height:16px;border-radius:50%;background:white;
+  transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.4)}
+.tog.on::after{left:20px}
+
+/* LOG */
+.logbox{background:var(--bg);border:1px solid var(--border);border-radius:var(--r);
+        padding:.75rem;height:220px;overflow-y:auto;
+        font-family:var(--font-mono);font-size:11px;
+        scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+.ll{display:flex;gap:9px;padding:2px 0;border-bottom:1px solid rgba(255,255,255,.03);line-height:1.6}
+.lt{color:var(--text3);flex-shrink:0}
+.li{color:var(--text2)}.lp{color:var(--green)}.lw{color:var(--amber)}.le{color:var(--red)}.lb{color:var(--cyan)}
+
+/* OPP */
+.opp{background:var(--bg3);border:1px solid var(--border);border-left:3px solid var(--green);
+     border-radius:var(--r);padding:.75rem 1rem;display:flex;align-items:center;
+     justify-content:space-between;margin-bottom:6px;animation:fi .25s ease}
+@keyframes fi{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.opp-path{font-size:12px;font-weight:500}
+.opp-meta{font-size:10px;color:var(--text3);margin-top:3px}
+.opp-bar{height:2px;background:var(--border);border-radius:1px;margin-top:4px;overflow:hidden}
+.opp-fill{height:100%;background:var(--green);border-radius:1px}
+.opp-pct{font-size:14px;font-weight:600;color:var(--green)}
+.opp-usdt{font-size:10px;color:rgba(0,230,118,.7);margin-bottom:4px}
+.empty{text-align:center;padding:2.5rem;color:var(--text3);font-size:12px}
+
+/* CHIPS */
+.chips{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:6px}
+.chip{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);
+      padding:7px 10px;font-size:11px;cursor:pointer;text-align:center;
+      color:var(--text2);transition:all .15s;user-select:none}
+.chip:hover{border-color:var(--bd2);color:var(--text)}
+.chip.on{border-color:var(--cyan);color:var(--cyan);background:var(--cdim)}
+
+/* NOTICE */
+.notice{background:rgba(255,171,64,.08);border:1px solid rgba(255,171,64,.2);
+        border-radius:var(--r);padding:.875rem 1rem;font-size:12px;
+        color:var(--amber);margin-bottom:1rem;line-height:1.7}
+.nok{background:var(--gdim);border-color:rgba(0,230,118,.25);color:var(--green)}
+.nerr{background:var(--rdim);border-color:rgba(255,79,79,.25);color:var(--red)}
+
+/* STEP */
+.step-item{display:flex;gap:1rem;padding:1rem 0;border-bottom:1px solid var(--border)}
+.step-item:last-child{border:none}
+.step-n{font-family:var(--font-sans);font-size:28px;font-weight:800;color:var(--border);line-height:1;flex-shrink:0;width:32px}
+.step-b h4{font-size:13px;font-weight:600;margin-bottom:.4rem}
+.step-b p{font-size:12px;color:var(--text2);line-height:1.75}
+.step-b code{font-family:var(--font-mono);color:var(--amber);background:var(--bg3);padding:1px 6px;border-radius:4px}
+
+.bottom{text-align:center;font-size:10px;color:var(--text3);padding:1.5rem 0;letter-spacing:.06em}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- HEADER -->
+<div class="hdr">
+  <div>
+    <span class="logo">ARB<span>X</span>BOT</span>
+    <span class="logo-sub">BingX Auto Arbitrage</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div class="pill"><span class="dot" id="sDot"></span><span id="sTxt">Bağlı değil</span></div>
+    <button class="btn btn-go" id="mainBtn" onclick="toggleBot()">▶ Botu Başlat</button>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab on"  onclick="showTab('setup',this)">⚙ Kurulum</button>
+  <button class="tab"     onclick="showTab('dash',this)">📊 Dashboard</button>
+  <button class="tab"     onclick="showTab('pairs',this)">🔁 Pariteler</button>
+  <button class="tab"     onclick="showTab('logs',this)">📋 Loglar</button>
+</div>
+
+<!-- ══ KURULUM ══ -->
+<div class="panel on" id="p-setup">
+  <div class="notice" id="mainNotice">
+    API key'lerini bir kez gir ve kaydet — bot otomatik bağlanır ve gerçek işlem alır.
+    Anahtarlar sadece bu sayfada saklanır, hiçbir yere gönderilmez.
+  </div>
+
+  <div class="g2">
+    <div class="card">
+      <div class="card-title">BingX API Anahtarları</div>
+      <div class="field">
+        <label>API Key</label>
+        <input type="password" id="apiKey" placeholder="API Key buraya...">
+      </div>
+      <div class="field">
+        <label>Secret Key</label>
+        <input type="password" id="secretKey" placeholder="Secret Key buraya...">
+      </div>
+      <div style="display:flex;gap:8px;margin-top:6px">
+        <button class="btn btn-cyan btn-sm" onclick="saveKeys()">💾 Kaydet</button>
+        <button class="btn btn-sm" onclick="testConn()">🔌 Test Et</button>
+      </div>
+      <div style="margin-top:10px;font-size:10px;color:var(--text3);line-height:1.9">
+        BingX → Hesabım → API Yönetimi → API Oluştur<br>
+        <span style="color:var(--amber)">⚠ Sadece "Spot İşlem" iznini ver!</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Bot Parametreleri</div>
+      <div class="sl-row">
+        <span class="sl-lbl">İşlem miktarı (USDT)</span>
+        <input type="range" id="rAmt" min="10" max="500" value="100" step="10"
+               oninput="setSl('vAmt',this.value)">
+        <span class="sl-val" id="vAmt">100</span>
+      </div>
+      <div class="sl-row">
+        <span class="sl-lbl">Min net kâr (%)</span>
+        <input type="range" id="rMin" min="0.05" max="1" value="0.1" step="0.05"
+               oninput="setSl('vMin',parseFloat(this.value).toFixed(2)+'%')">
+        <span class="sl-val" id="vMin">0.10%</span>
+      </div>
+      <div class="sl-row">
+        <span class="sl-lbl">Tarama hızı (ms)</span>
+        <input type="range" id="rSpd" min="500" max="5000" value="1500" step="100"
+               oninput="setSl('vSpd',this.value+'ms')">
+        <span class="sl-val" id="vSpd">1500ms</span>
+      </div>
+      <div class="sl-row">
+        <span class="sl-lbl">Günlük max zarar</span>
+        <input type="range" id="rLoss" min="5" max="200" value="30" step="5"
+               oninput="setSl('vLoss',this.value+' USDT')">
+        <span class="sl-val" id="vLoss">30 USDT</span>
+      </div>
+      <div class="tog-row">
+        <div>
+          <div class="tog-lbl">Simülasyon modu</div>
+          <div class="tog-sub">Açıkken gerçek emir gönderilmez</div>
+        </div>
+        <button class="tog on" id="togSim" onclick="this.classList.toggle('on')"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Nasıl Kullanılır</div>
+    <div class="step-item">
+      <div class="step-n">01</div>
+      <div class="step-b">
+        <h4>BingX'te API Key Oluştur</h4>
+        <p>BingX → Hesabım → <code>API Yönetimi</code> → <code>API Oluştur</code><br>
+        Sadece <code>Spot İşlem</code> iznini ver. Para çekme iznini asla verme.</p>
+      </div>
+    </div>
+    <div class="step-item">
+      <div class="step-n">02</div>
+      <div class="step-b">
+        <h4>Anahtarları Gir ve Kaydet</h4>
+        <p>API Key + Secret Key'i yukarıya yapıştır → <code>Kaydet</code> → <code>Test Et</code><br>
+        "Bağlantı başarılı" mesajı görünce hazırsın.</p>
+      </div>
+    </div>
+    <div class="step-item">
+      <div class="step-n">03</div>
+      <div class="step-b">
+        <h4>Önce Simülasyonda Test Et</h4>
+        <p>Simülasyon açık → <code>▶ Botu Başlat</code> → Dashboard'dan fırsatları izle.<br>
+        Gerçek emir gönderilmez, para harcanmaz.</p>
+      </div>
+    </div>
+    <div class="step-item">
+      <div class="step-n">04</div>
+      <div class="step-b">
+        <h4>Canlı Modu Aç</h4>
+        <p>Simülasyon <code>Kapat</code> → <code>▶ Botu Başlat</code><br>
+        Bot fırsat bulunca <strong>otomatik olarak</strong> 3 emir gönderir ve kâr eder.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ DASHBOARD ══ -->
+<div class="panel" id="p-dash">
+  <div class="g3" style="margin-bottom:1rem">
+    <div class="metric"><div class="mlbl">Toplam Kâr</div>
+      <div class="mval g" id="mP">+0.0000</div><div class="msub">USDT</div></div>
+    <div class="metric"><div class="mlbl">İşlem</div>
+      <div class="mval b" id="mT">0</div></div>
+    <div class="metric"><div class="mlbl">Başarı</div>
+      <div class="mval a" id="mR">—</div></div>
+  </div>
+  <div class="g2" style="margin-bottom:1rem">
+    <div class="metric"><div class="mlbl">Tarama</div><div class="mval" id="mS">0</div></div>
+    <div class="metric"><div class="mlbl">Aktif Fırsat</div><div class="mval" id="mO">0</div></div>
+  </div>
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+      <div class="card-title" style="margin-bottom:0">Canlı Fırsatlar</div>
+      <span style="font-size:10px;color:var(--text3)" id="scanLbl"></span>
+    </div>
+    <div id="oppList"><div class="empty">Bot başlatıldığında fırsatlar görünür...</div></div>
+  </div>
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+      <div class="card-title" style="margin-bottom:0">Son İşlemler</div>
+      <button class="btn btn-sm" onclick="clrLog('tlog')">Temizle</button>
+    </div>
+    <div class="logbox" id="tlog">
+      <div class="ll"><span class="lt">--:--:--</span><span class="li">Henüz işlem yok.</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PARİTELER ══ -->
+<div class="panel" id="p-pairs">
+  <div class="card">
+    <div class="card-title">Arbitraj Döngüsü</div>
+    <div style="font-size:12px;color:var(--text2);line-height:1.9;margin-bottom:.75rem">
+      Her coin için: <span style="color:var(--cyan);font-family:var(--font-mono)">USDT → COIN/USDT (BUY) → COIN/USDC (SELL) → USDC/USDT (SELL)</span><br>
+      Net kâr = çıkış − giriş. Fee (API'dan çekilir) + slippage düşülür. Kârsızsa atlanır.
+    </div>
+  </div>
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+      <div class="card-title" style="margin-bottom:0">Taranacak Coinler</div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-sm" onclick="allChips(true)">Tümü</button>
+        <button class="btn btn-sm" onclick="allChips(false)">Hiçbiri</button>
+      </div>
+    </div>
+    <div class="chips" id="chipGrid"></div>
+  </div>
+</div>
+
+<!-- ══ LOGLAR ══ -->
+<div class="panel" id="p-logs">
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+      <div class="card-title" style="margin-bottom:0">Sistem Logları</div>
+      <button class="btn btn-sm" onclick="clrLog('flog')">Temizle</button>
+    </div>
+    <div class="logbox" style="height:500px" id="flog">
+      <div class="ll"><span class="lt">00:00:00</span><span class="li">Sistem hazır.</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="bottom">ARBXBot · Kripto ticareti risk içerir · Yatırım tavsiyesi değildir</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+//  CONFIG
+// ═══════════════════════════════════════════
+const COINS_ALL = ['BTC','ETH','BNB','SOL','XRP','ADA','AVAX','LTC','LINK','DOT','ATOM','NEAR','TRX','DOGE','MATIC'];
+let selected = new Set(['BTC','ETH','BNB','SOL','XRP','ADA']);
+let running=false, timer=null;
+let profit=0, dayLoss=0, trades=0, wins=0, scans=0, openPos=0;
+let cachedFee=0.001, feeFetchedAt=0;
+
+const $  = id => document.getElementById(id);
+const ts = () => new Date().toTimeString().slice(0,8);
+const f2 = v  => parseFloat(v).toFixed(2);
+const setSl = (id,v) => { const e=$(id); if(e) e.textContent=v; };
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+const SIM   = () => $('togSim').classList.contains('on');
+
+// ═══════════════════════════════════════════
+//  LOG
+// ═══════════════════════════════════════════
+function addLog(cls, msg, toTrade=false) {
+  const h = `<div class="ll"><span class="lt">${ts()}</span><span class="${cls}">${msg}</span></div>`;
+  const fl=$('flog'); if(fl){fl.innerHTML+=h;fl.scrollTop=fl.scrollHeight;}
+  if(toTrade){const tl=$('tlog');if(tl){tl.innerHTML+=h;tl.scrollTop=tl.scrollHeight;}}
+}
+function clrLog(id){const e=$(id);if(e)e.innerHTML='';}
+
+// ═══════════════════════════════════════════
+//  TABS / UI
+// ═══════════════════════════════════════════
+function showTab(name,btn){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  $('p-'+name).classList.add('on');
+  if(btn)btn.classList.add('on');
+}
+function setNotice(msg,type=''){
+  const n=$('mainNotice');
+  n.className='notice '+(type==='ok'?'nok':type==='err'?'nerr':'');
+  n.textContent=msg;
+}
+
+// ═══════════════════════════════════════════
+//  API KEY
+// ═══════════════════════════════════════════
+function saveKeys(){
+  const k=$('apiKey').value.trim(), s=$('secretKey').value.trim();
+  if(!k||!s){setNotice('API Key ve Secret Key boş olamaz!','err');return;}
+  localStorage.setItem('bx_api',k);
+  localStorage.setItem('bx_sec',s);
+  addLog('lb','✓ API anahtarları kaydedildi');
+  setNotice('Anahtarlar kaydedildi. Şimdi "Test Et" butonuna bas.','ok');
+}
+function loadKeys(){
+  const k=localStorage.getItem('bx_api'),s=localStorage.getItem('bx_sec');
+  if(k)$('apiKey').value=k;
+  if(s)$('secretKey').value=s;
+}
+function getKeys(){
+  return{
+    apiKey:   ($('apiKey').value.trim()    || localStorage.getItem('bx_api')    || ''),
+    secretKey:($('secretKey').value.trim() || localStorage.getItem('bx_sec') || ''),
+  };
+}
+
+// ═══════════════════════════════════════════
+//  NETLIFY FUNCTION PROXY — CORS'u geçer
+//  Tüm BingX istekleri buradan geçer
+// ═══════════════════════════════════════════
+async function bxProxy(method, path, params={}) {
+  const {apiKey, secretKey} = getKeys();
+  const res = await fetch('/.netlify/functions/bingx', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({apiKey, secretKey, method, path, params}),
+  });
+  return res.json();
+}
+
+// Public market data (imzasız) — ayrı proxy
+async function mktProxy(path, symbol, limit=5) {
+  const qs = `path=${encodeURIComponent(path)}&symbol=${encodeURIComponent(symbol)}&limit=${limit}`;
+  const res = await fetch(`/.netlify/functions/market?${qs}`);
+  return res.json();
+}
+
+// ═══════════════════════════════════════════
+//  BAĞLANTI TESTİ
+// ═══════════════════════════════════════════
+async function testConn(){
+  const {apiKey,secretKey}=getKeys();
+  if(!apiKey||!secretKey){setNotice('API Key girilmemiş!','err');return;}
+  addLog('lb','BingX bağlantısı test ediliyor...');
+  setNotice('Test ediliyor...');
+
+  // Public test
+  const pub = await mktProxy('/openApi/spot/v1/common/symbols','BTC-USDT');
+  if(pub.code!==0){
+    addLog('le',`Public API hatası: ${JSON.stringify(pub)}`);
+    setNotice(`Bağlantı hatası: ${pub.msg||JSON.stringify(pub)}`,'err');
+    return;
+  }
+  addLog('lp','✓ Public API OK');
+
+  // Bakiye
+  const bal = await bxProxy('GET','/openApi/spot/v1/account/balance');
+  if(bal.code!==0){
+    addLog('le',`Bakiye hatası (API Key yanlış?): ${JSON.stringify(bal)}`);
+    setNotice(`API Key hatası: ${bal.msg}`,'err');
+    return;
+  }
+  const bals = bal?.data?.balances||[];
+  const usdt = parseFloat(bals.find(b=>b.asset==='USDT')?.free||0);
+  const usdc = parseFloat(bals.find(b=>b.asset==='USDC')?.free||0);
+  addLog('lp',`✓ Bakiye  USDT: ${usdt.toFixed(4)}  USDC: ${usdc.toFixed(4)}`);
+
+  // Fee
+  const feeD = await bxProxy('GET','/openApi/spot/v1/user/commissionRate');
+  if(feeD.code===0){
+    const f=parseFloat(feeD?.data?.takerCommissionRate||0.001);
+    addLog('lp',`✓ Taker fee: ${(f*100).toFixed(3)}%  (3-leg: ${(f*3*100).toFixed(3)}%)`);
+    cachedFee=f; feeFetchedAt=Date.now();
+  }
+
+  $('sDot').className='dot on';
+  $('sTxt').textContent='Bağlı';
+  setNotice(`Bağlantı başarılı! USDT: ${usdt.toFixed(2)}  USDC: ${usdc.toFixed(2)}  Fee: ${(cachedFee*100).toFixed(3)}%`,'ok');
+}
+
+// ═══════════════════════════════════════════
+//  FEE (5dk cache)
+// ═══════════════════════════════════════════
+async function getTakerFee(){
+  if(Date.now()-feeFetchedAt<300000) return cachedFee;
+  const d=await bxProxy('GET','/openApi/spot/v1/user/commissionRate');
+  if(d.code===0){
+    cachedFee=parseFloat(d?.data?.takerCommissionRate||0.001);
+    feeFetchedAt=Date.now();
+    addLog('li',`Fee güncellendi: ${(cachedFee*100).toFixed(3)}%`);
+  }
+  return cachedFee;
+}
+
+// ═══════════════════════════════════════════
+//  PİYASA VERİSİ (proxy üzerinden)
+// ═══════════════════════════════════════════
+async function getBestAsk(symbol){
+  const d=await mktProxy('/openApi/spot/v1/market/depth',symbol,5);
+  if(d.code!==0||!d?.data?.asks?.length) return null;
+  const asks=d.data.asks.sort((a,b)=>parseFloat(a[0])-parseFloat(b[0]));
+  return parseFloat(asks[0][0]);
+}
+async function getBestBid(symbol){
+  const d=await mktProxy('/openApi/spot/v1/market/depth',symbol,5);
+  if(d.code!==0||!d?.data?.bids?.length) return null;
+  const bids=d.data.bids.sort((a,b)=>parseFloat(b[0])-parseFloat(a[0]));
+  return parseFloat(bids[0][0]);
+}
+
+// ═══════════════════════════════════════════
+//  FIRSAT HESABI — fee dahil, kârsızsa null
+// ═══════════════════════════════════════════
+async function calcOpp(coin, amt, fee){
+  const sym1=`${coin}-USDT`, sym2=`${coin}-USDC`, sym3='USDC-USDT';
+  const [ask1,bid2,bid3] = await Promise.all([getBestAsk(sym1),getBestBid(sym2),getBestBid(sym3)]);
+  if(!ask1||!bid2||!bid3||ask1<=0||bid2<=0||bid3<=0) return null;
+
+  // LEG1: amt USDT → coin (taker fee coin'den kesilir)
+  const coinsRaw = amt/ask1;
+  const coins    = coinsRaw*(1-fee);
+  const fee1     = coinsRaw*fee*ask1;
+
+  // LEG2: coin → USDC (taker fee USDC'den)
+  const usdcRaw  = coins*bid2;
+  const usdc     = usdcRaw*(1-fee);
+  const fee2     = usdcRaw*fee;
+
+  // LEG3: USDC → USDT (taker fee USDT'den)
+  const usdtRaw  = usdc*bid3;
+  const usdtOut  = usdtRaw*(1-fee);
+  const fee3     = usdtRaw*fee;
+
+  const totalFee = fee1+fee2+fee3;
+  const net      = usdtOut-amt;
+  const pct      = (net/amt)*100;
+
+  if(net<=0) return null; // Kârsız — atla
+  return {coin,sym1,sym2,sym3,ask1,bid2,bid3,coins,usdc,usdtOut,net,pct,totalFee,fee,amt};
+}
+
+// ═══════════════════════════════════════════
+//  EMİR GÖNDERME — proxy üzerinden gerçek API
+// ═══════════════════════════════════════════
+async function sendBuy(symbol, quoteUsdt){
+  addLog('li',`  LEG1 ► BUY  ${symbol}  ${quoteUsdt.toFixed(4)} USDT`);
+  if(SIM()){
+    addLog('lw','    [SIM] emir gönderilmedi');
+    const d=await mktProxy('/openApi/spot/v1/market/depth',symbol,1);
+    const asks=d?.data?.asks||[['1','1']];
+    const price=parseFloat(asks[0][0])||1;
+    return {code:0,sim:true,approxCoins:(quoteUsdt/price)*0.999,
+            data:{orderId:`SIM${Date.now()}`}};
+  }
+  // CANLI — gerçek BingX emri
+  const r = await bxProxy('POST','/openApi/spot/v1/trade/order',{
+    symbol, side:'BUY', type:'MARKET', quoteOrderQty:quoteUsdt.toString()
+  });
+  return r;
+}
+
+async function sendSell(symbol, qty){
+  addLog('li',`  LEG  ► SELL ${symbol}  ${qty.toFixed(8)}`);
+  if(SIM()){
+    addLog('lw','    [SIM] emir gönderilmedi');
+    const d=await mktProxy('/openApi/spot/v1/market/depth',symbol,1);
+    const bids=d?.data?.bids||[['1','1']];
+    const price=parseFloat(bids[0][0])||1;
+    return {code:0,sim:true,approxQuote:qty*price*0.999,
+            data:{orderId:`SIM${Date.now()}`}};
+  }
+  // CANLI — gerçek BingX emri
+  const r = await bxProxy('POST','/openApi/spot/v1/trade/order',{
+    symbol, side:'SELL', type:'MARKET', quantity:qty.toString()
+  });
+  return r;
+}
+
+async function waitFill(symbol, orderId, tries=8){
+  for(let i=0;i<tries;i++){
+    await sleep(500);
+    const d=await bxProxy('GET','/openApi/spot/v1/trade/query',{symbol,orderId});
+    const st=d?.data||{};
+    if(['FILLED','PARTIALLY_FILLED'].includes(st.status)) return st;
+  }
+  return {};
+}
+
+// ═══════════════════════════════════════════
+//  3 LEG OTOMATİK YÜRÜTME
+// ═══════════════════════════════════════════
+async function executeTrade(opp){
+  const sim=SIM(), tag=sim?'[SIM]':'[LIVE]';
+  addLog('lb',`${tag} OTOMATİK: ${opp.sym1} → ${opp.sym2} → ${opp.sym3}`,true);
+  addLog('lb',`  Hedef net: +${opp.net.toFixed(5)} USDT (${opp.pct.toFixed(4)}%)  Fee: ${opp.totalFee.toFixed(5)} USDT`,true);
+
+  // Bakiye kontrolü (canlı mod)
+  if(!sim){
+    const bal=await bxProxy('GET','/openApi/spot/v1/account/balance');
+    const bals=bal?.data?.balances||[];
+    const avail=parseFloat(bals.find(b=>b.asset==='USDT')?.free||0);
+    if(avail<opp.amt){
+      addLog('le',`  ✗ BAKİYE YETERSİZ: ${avail.toFixed(4)} USDT (gerekli: ${opp.amt})`,true);
+      return{ok:false,net:0};
+    }
+    addLog('li',`  Bakiye: ${avail.toFixed(4)} USDT ✓`);
+  }
+
+  // ── LEG 1 ──
+  const r1=await sendBuy(opp.sym1,opp.amt);
+  if(r1.code!==0){addLog('le',`  ✗ LEG1 HATA: ${r1.code} ${r1.msg||''}`,true);return{ok:false,net:0};}
+
+  let coins;
+  if(sim){coins=r1.approxCoins||opp.coins;}
+  else{
+    await sleep(600);
+    const oid1=String(r1?.data?.orderId||'');
+    const f1=await waitFill(opp.sym1,oid1);
+    coins=parseFloat(f1.executedQty||0);
+    if(coins<=0){addLog('le','  ✗ LEG1 dolum=0',true);return{ok:false,net:0};}
+  }
+  addLog('lp',`  ✓ LEG1 → ${coins.toFixed(8)} ${opp.coin}`,true);
+
+  // ── LEG 2 ──
+  const r2=await sendSell(opp.sym2,Math.floor(coins*1e8)/1e8);
+  if(r2.code!==0){
+    addLog('le',`  ✗ LEG2 HATA: ${r2.code} ${r2.msg||''}`,true);
+    if(!sim) addLog('lw',`  ⚠ ${coins.toFixed(8)} ${opp.coin} elde kaldı! ${opp.sym2} üzerinden sat.`,true);
+    return{ok:false,net:0};
+  }
+
+  let usdc;
+  if(sim){usdc=r2.approxQuote||opp.usdc;}
+  else{
+    await sleep(600);
+    const oid2=String(r2?.data?.orderId||'');
+    const f2=await waitFill(opp.sym2,oid2);
+    usdc=parseFloat(f2.cummulativeQuoteQty||0);
+    if(usdc<=0){
+      addLog('le','  ✗ LEG2 dolum=0',true);
+      if(!sim) addLog('lw',`  ⚠ ${coins.toFixed(8)} ${opp.coin} elde kaldı!`,true);
+      return{ok:false,net:0};
+    }
+  }
+  addLog('lp',`  ✓ LEG2 → ${usdc.toFixed(6)} USDC`,true);
+
+  // ── LEG 3 ──
+  const r3=await sendSell(opp.sym3,Math.floor(usdc*1e6)/1e6);
+  if(r3.code!==0){
+    addLog('le',`  ✗ LEG3 HATA: ${r3.code} ${r3.msg||''}`,true);
+    if(!sim) addLog('lw',`  ⚠ ${usdc.toFixed(6)} USDC elde kaldı! USDC-USDT üzerinden sat.`,true);
+    return{ok:false,net:0};
+  }
+
+  let usdtFinal;
+  if(sim){usdtFinal=r3.approxQuote||opp.usdtOut;}
+  else{
+    await sleep(600);
+    const oid3=String(r3?.data?.orderId||'');
+    const f3=await waitFill(opp.sym3,oid3);
+    usdtFinal=parseFloat(f3.cummulativeQuoteQty||opp.usdtOut);
+  }
+
+  const actualNet=usdtFinal-opp.amt;
+  const actualPct=(actualNet/opp.amt)*100;
+  const col=actualNet>=0?'lp':'le';
+  addLog('lp',`  ✓ LEG3 → ${usdtFinal.toFixed(6)} USDT`,true);
+  addLog(col,`  ══ NET: ${actualNet>=0?'+':''}${actualNet.toFixed(5)} USDT (${actualPct>=0?'+':''}${actualPct.toFixed(4)}%) ══`,true);
+  return{ok:true,net:actualNet};
+}
+
+// ═══════════════════════════════════════════
+//  TARAMA DÖNGÜSÜ
+// ═══════════════════════════════════════════
+async function scanOnce(){
+  if(!running) return;
+  scans++;
+  setSl('mS',scans.toLocaleString());
+  setSl('scanLbl',`#${scans}`);
+
+  const {apiKey,secretKey}=getKeys();
+  if(!apiKey||!secretKey){
+    addLog('le','API key eksik! Botu durduruyorum.');
+    stopBot();return;
+  }
+
+  const fee    = await getTakerFee();
+  const amt    = parseFloat($('rAmt').value);
+  const minPct = parseFloat($('rMin').value);
+
+  const results = await Promise.all([...selected].map(c=>calcOpp(c,amt,fee)));
+  const opps    = results.filter(o=>o&&o.net>0&&o.pct>=minPct).sort((a,b)=>b.net-a.net);
+
+  setSl('mO',opps.length);
+  const ol=$('oppList');
+
+  if(!opps.length){
+    ol.innerHTML=`<div class="empty">Taranıyor... (${scans}. tarama, ${[...selected].length} çift)</div>`;
+  } else {
+    ol.innerHTML=opps.map(o=>`
+      <div class="opp">
+        <div style="flex:1">
+          <div class="opp-path">USDT → ${o.sym1} → ${o.sym2} → ${o.sym3}</div>
+          <div class="opp-meta">ask=${o.ask1.toFixed(5)} bid2=${o.bid2.toFixed(5)} bid3=${o.bid3.toFixed(6)} | fee=${o.totalFee.toFixed(5)} USDT</div>
+          <div class="opp-bar"><div class="opp-fill" style="width:${Math.min(o.pct*80,100)}%"></div></div>
+        </div>
+        <div style="text-align:right;margin-left:12px">
+          <div class="opp-pct">+${o.pct.toFixed(4)}%</div>
+          <div class="opp-usdt">+${o.net.toFixed(5)} USDT</div>
+        </div>
+      </div>`).join('');
+
+    // En iyi fırsata OTOMATİK GİR
+    if(openPos<1){
+      const best=opps[0];
+      openPos++;
+      try{
+        const{ok,net}=await executeTrade(best);
+        trades++;
+        if(ok){
+          wins++;
+          profit+=net;
+          if(net<0) dayLoss+=Math.abs(net);
+        } else {
+          const loss=best.amt*cachedFee*3;
+          dayLoss+=loss; profit-=loss;
+        }
+        updateM();
+        const maxLoss=parseFloat($('rLoss').value);
+        if(dayLoss>=maxLoss){
+          addLog('le',`⛔ Günlük zarar limiti (${maxLoss} USDT) aşıldı! Bot durdu.`,true);
+          stopBot();
+        }
+      }finally{openPos--;}
+    }
+  }
+}
+
+function updateM(){
+  const e=$('mP');
+  e.textContent=(profit>=0?'+':'')+profit.toFixed(4);
+  e.className='mval '+(profit>=0?'g':'r');
+  setSl('mT',trades);
+  setSl('mR',trades?Math.round(wins/trades*100)+'%':'—');
+}
+
+// ═══════════════════════════════════════════
+//  BOT KONTROL
+// ═══════════════════════════════════════════
+function toggleBot(){running?stopBot():startBot();}
+
+async function startBot(){
+  const{apiKey,secretKey}=getKeys();
+  if(!apiKey||!secretKey){
+    setNotice('API key eksik! Önce kaydet ve test et.','err');
+    addLog('le','API key girilmemiş!');
+    return;
+  }
+  running=true; dayLoss=0;
+  $('sDot').className='dot on';
+  $('sTxt').textContent=SIM()?'Simülasyon':'Canlı';
+  $('mainBtn').className='btn btn-stop';
+  $('mainBtn').textContent='■ Durdur';
+  const sim=SIM();
+  addLog('lb',`══ BOT BAŞLADI — ${sim?'SİMÜLASYON':'CANLI GERÇEK İŞLEM'} ══`);
+  addLog('li',`Miktar: ${$('rAmt').value} USDT  Min kâr: ${$('rMin').value}%  Coinler: ${[...selected].join(',')}`);
+  if(!sim) addLog('lw','⚠ CANLI MOD — Gerçek emir gönderiliyor!');
+  showTab('dash',document.querySelector('.tab:nth-child(2)'));
+  await scanOnce();
+  const spd=parseInt($('rSpd').value);
+  timer=setInterval(scanOnce,spd);
+}
+
+function stopBot(){
+  running=false; clearInterval(timer);
+  $('sDot').className='dot';
+  $('sTxt').textContent='Durduruldu';
+  $('mainBtn').className='btn btn-go';
+  $('mainBtn').textContent='▶ Botu Başlat';
+  $('oppList').innerHTML='<div class="empty">Bot durduruldu.</div>';
+  addLog('lw','══ BOT DURDURULDU ══');
+}
+
+// ═══════════════════════════════════════════
+//  COİN SEÇİMİ
+// ═══════════════════════════════════════════
+function buildChips(){
+  const g=$('chipGrid'); g.innerHTML='';
+  COINS_ALL.forEach(coin=>{
+    const d=document.createElement('div');
+    d.className='chip'+(selected.has(coin)?' on':'');
+    d.textContent=coin;
+    d.onclick=()=>{selected.has(coin)?selected.delete(coin):selected.add(coin);buildChips();};
+    g.appendChild(d);
+  });
+}
+function allChips(v){if(v)COINS_ALL.forEach(c=>selected.add(c));else selected.clear();buildChips();}
+
+// INIT
+loadKeys();
+buildChips();
+</script>
+</body>
+</html>
