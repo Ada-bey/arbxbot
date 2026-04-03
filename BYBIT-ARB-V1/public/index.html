@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ARBXBot — Bybit Triangular Arbitraj</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#060810;--bg2:#0b0e18;--bg3:#10141f;
+  --b:rgba(255,255,255,.07);--b2:rgba(255,255,255,.13);
+  --t:#e4e8f5;--t2:#8590ab;--t3:#424b63;
+  --green:#00e676;--red:#ff4b4b;--cyan:#00cfff;--amber:#ffb347;--blue:#4d9fff;
+  --r:8px;--rl:12px;
+}
+body{background:var(--bg);color:var(--t);font-family:'JetBrains Mono',monospace;font-size:13px;min-height:100vh}
+.wrap{max-width:1080px;margin:0 auto;padding:1.25rem 1rem}
+
+/* HEADER */
+.hdr{display:flex;align-items:center;justify-content:space-between;
+     background:var(--bg2);border:1px solid var(--b);border-radius:var(--rl);
+     padding:.875rem 1.5rem;margin-bottom:1rem}
+.logo{font-family:'Syne',sans-serif;font-size:21px;font-weight:800;letter-spacing:-.5px}
+.logo em{color:var(--cyan);font-style:normal}
+.logo-tag{font-size:10px;color:var(--t3);font-family:'JetBrains Mono',monospace;
+           font-weight:400;letter-spacing:.08em;margin-left:8px;text-transform:uppercase}
+.pill{display:flex;align-items:center;gap:7px;background:var(--bg3);
+      border:1px solid var(--b);border-radius:20px;padding:4px 14px;font-size:11px;color:var(--t3)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--t3)}
+.dot.on{background:var(--green);box-shadow:0 0 7px var(--green);animation:pulse 1.5s infinite}
+.dot.err{background:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* TABS */
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--b);margin-bottom:1rem;overflow-x:auto}
+.tab{padding:7px 18px;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.07em;
+     text-transform:uppercase;color:var(--t3);border:none;border-bottom:2px solid transparent;
+     background:transparent;cursor:pointer;white-space:nowrap;transition:color .15s}
+.tab:hover{color:var(--t2)}.tab.on{color:var(--cyan);border-bottom-color:var(--cyan)}
+.pnl{display:none}.pnl.on{display:block}
+
+/* CARD */
+.card{background:var(--bg2);border:1px solid var(--b);border-radius:var(--rl);padding:1.25rem;margin-bottom:.875rem}
+.ct{font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:var(--t3);margin-bottom:.875rem;font-weight:500}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:.875rem}
+.g4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px}
+@media(max-width:600px){.g2,.g4{grid-template-columns:1fr 1fr}}
+
+/* METRICS */
+.m{background:var(--bg3);border:1px solid var(--b);border-radius:var(--r);padding:.75rem 1rem}
+.ml{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px}
+.mv{font-size:19px;font-weight:600}
+.mv.g{color:var(--green)}.mv.r{color:var(--red)}.mv.b{color:var(--blue)}.mv.a{color:var(--amber)}.mv.c{color:var(--cyan)}
+
+/* INPUTS */
+.fld{margin-bottom:10px}
+.fld label{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);display:block;margin-bottom:4px}
+input[type=text],input[type=password]{width:100%;background:var(--bg);border:1px solid var(--b2);
+  border-radius:var(--r);padding:9px 12px;font-size:12px;font-family:'JetBrains Mono',monospace;
+  color:var(--t);outline:none;transition:border-color .15s}
+input[type=text]:focus,input[type=password]:focus{border-color:var(--cyan)}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 20px;border-radius:var(--r);
+     font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;cursor:pointer;
+     border:1px solid var(--b2);background:var(--bg3);color:var(--t);transition:all .15s}
+.btn:hover{border-color:rgba(255,255,255,.2)}
+.btn-go{background:rgba(0,230,118,.12);border-color:var(--green);color:var(--green)}
+.btn-go:hover{background:rgba(0,230,118,.2)}
+.btn-stop{background:rgba(255,75,75,.12);border-color:var(--red);color:var(--red)}
+.btn-cyan{background:rgba(0,207,255,.1);border-color:var(--cyan);color:var(--cyan)}
+.btn-sm{padding:6px 14px;font-size:11px}
+
+/* SLIDERS */
+.sr{display:flex;align-items:center;gap:9px;margin-bottom:9px}
+.sl{font-size:11px;color:var(--t2);min-width:155px}
+.sv{font-size:12px;color:var(--cyan);min-width:68px;text-align:right;font-weight:500}
+input[type=range]{flex:1;-webkit-appearance:none;height:3px;background:var(--b2);border-radius:2px;outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
+  border-radius:50%;background:var(--cyan);border:2px solid var(--bg);cursor:pointer;transition:transform .1s}
+input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.2)}
+
+/* TOGGLE */
+.tr{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--b)}
+.tl{font-size:12px;color:var(--t2);font-weight:500}.ts{font-size:10px;color:var(--t3);margin-top:2px}
+.tog{width:38px;height:20px;background:var(--b2);border-radius:10px;position:relative;
+     cursor:pointer;border:none;transition:background .2s;flex-shrink:0}
+.tog.on{background:var(--green)}
+.tog::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;
+  border-radius:50%;background:white;transition:left .2s;box-shadow:0 1px 4px rgba(0,0,0,.4)}
+.tog.on::after{left:20px}
+
+/* LOG */
+.log{background:var(--bg);border:1px solid var(--b);border-radius:var(--r);
+     padding:.625rem;overflow-y:auto;font-size:11px;line-height:1;
+     scrollbar-width:thin;scrollbar-color:var(--b) transparent}
+.log::-webkit-scrollbar{width:3px}
+.log::-webkit-scrollbar-thumb{background:var(--b2)}
+.ll{display:flex;gap:9px;padding:2px 0;line-height:1.75}
+.lt{color:var(--t3);flex-shrink:0}
+.li{color:var(--t2)}.lp{color:var(--green)}.lw{color:var(--amber)}.le{color:var(--red)}.lb{color:var(--cyan)}
+
+/* OPPORTUNITY CARD */
+.opp{background:var(--bg3);border:1px solid var(--b);border-left:3px solid var(--green);
+     border-radius:var(--r);padding:.7rem 1rem;display:flex;align-items:center;
+     justify-content:space-between;margin-bottom:6px;animation:fi .2s ease;cursor:default}
+@keyframes fi{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.op-path{font-size:12px;font-weight:500;color:var(--t)}
+.op-meta{font-size:10px;color:var(--t3);margin-top:3px}
+.op-bar{height:2px;background:var(--b);border-radius:1px;margin-top:4px;overflow:hidden;width:180px}
+.op-fill{height:100%;background:var(--green);border-radius:1px;transition:width .3s}
+.op-pct{font-size:14px;font-weight:700;color:var(--green);text-align:right}
+.op-usdt{font-size:10px;color:rgba(0,230,118,.7);text-align:right;margin-top:1px}
+.empty{text-align:center;padding:2rem;color:var(--t3);font-size:12px;line-height:1.8}
+
+/* NOTICE */
+.notice{border-radius:var(--r);padding:.75rem 1.125rem;font-size:12px;margin-bottom:.875rem;line-height:1.75}
+.ninfo{background:rgba(0,207,255,.07);border:1px solid rgba(0,207,255,.2);color:var(--cyan)}
+.nok{background:rgba(0,230,118,.08);border:1px solid rgba(0,230,118,.22);color:var(--green)}
+.nerr{background:rgba(255,75,75,.08);border:1px solid rgba(255,75,75,.22);color:var(--red)}
+.nwarn{background:rgba(255,179,71,.08);border:1px solid rgba(255,179,71,.22);color:var(--amber)}
+
+/* STEP */
+.step{display:flex;gap:1rem;padding:.875rem 0;border-bottom:1px solid var(--b)}
+.step:last-child{border:none}
+.step-n{font-family:'Syne',sans-serif;font-size:30px;font-weight:800;color:var(--b2);line-height:1;flex-shrink:0;width:34px}
+.step-h{font-size:13px;font-weight:600;margin-bottom:.35rem;color:var(--t)}
+.step-p{font-size:12px;color:var(--t2);line-height:1.75}
+.step-p code{color:var(--amber);font-family:'JetBrains Mono',monospace;background:var(--bg3);padding:1px 6px;border-radius:4px}
+
+.row{display:flex;align-items:center;gap:8px}
+.foot{text-align:center;font-size:10px;color:var(--t3);padding:1.5rem 0;letter-spacing:.06em}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- HEADER -->
+<div class="hdr">
+  <div>
+    <span class="logo">ARB<em>X</em>BOT</span>
+    <span class="logo-tag">Bybit V5 · Triangular Arbitrage</span>
+  </div>
+  <div class="row">
+    <div class="pill"><span class="dot" id="sDot"></span><span id="sTxt">Bağlı değil</span></div>
+    <button class="btn btn-go" id="mainBtn" onclick="toggleBot()">▶ Botu Başlat</button>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab on"  onclick="tab('setup',this)">Kurulum</button>
+  <button class="tab"     onclick="tab('dash',this)">Dashboard</button>
+  <button class="tab"     onclick="tab('routes',this)">Aktif Rotalar</button>
+  <button class="tab"     onclick="tab('logs',this)">Loglar</button>
+</div>
+
+<!-- ══ KURULUM ══ -->
+<div class="pnl on" id="p-setup">
+  <div class="notice ninfo" id="mainNotice">
+    Bybit API key gir → Kaydet → Test Et → Botu Başlat. Bot USDT/USDC paritelerini otomatik keşfeder ve triangular arbitraj yapar.
+  </div>
+
+  <div class="g2">
+    <div class="card">
+      <div class="ct">Bybit V5 API Anahtarları</div>
+      <div class="fld"><label>API Key</label><input type="password" id="apiKey" placeholder="Bybit API Key..."></div>
+      <div class="fld"><label>API Secret</label><input type="password" id="secKey" placeholder="Bybit API Secret..."></div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn btn-cyan btn-sm" onclick="saveKeys()">💾 Kaydet</button>
+        <button class="btn btn-sm" onclick="testConn()">🔌 Bağlantıyı Test Et</button>
+      </div>
+      <div style="margin-top:12px;font-size:10px;color:var(--t3);line-height:2">
+        Bybit → Hesabım → API → API Key Oluştur<br>
+        İzinler: <span style="color:var(--amber)">Unified Trading — Spot İzni</span><br>
+        IP kısıtlaması önerilir (güvenlik için)
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ct">Bot Parametreleri</div>
+      <div class="sr">
+        <span class="sl">İşlem miktarı (USDT)</span>
+        <input type="range" id="rAmt" min="5" max="500" value="100" step="5" oninput="sv('vAmt',this.value+' USDT')">
+        <span class="sv" id="vAmt">100 USDT</span>
+      </div>
+      <div class="sr">
+        <span class="sl">Min net kâr (%)</span>
+        <input type="range" id="rMin" min="0.05" max="2" value="0.1" step="0.05" oninput="sv('vMin',f2(this.value)+'%')">
+        <span class="sv" id="vMin">0.10%</span>
+      </div>
+      <div class="sr">
+        <span class="sl">Tarama hızı (ms)</span>
+        <input type="range" id="rSpd" min="500" max="5000" value="1500" step="250" oninput="sv('vSpd',this.value+'ms')">
+        <span class="sv" id="vSpd">1500ms</span>
+      </div>
+      <div class="sr">
+        <span class="sl">Günlük max zarar</span>
+        <input type="range" id="rLoss" min="5" max="200" value="30" step="5" oninput="sv('vLoss',this.value+' USDT')">
+        <span class="sv" id="vLoss">30 USDT</span>
+      </div>
+      <div class="tr">
+        <div><div class="tl">Simülasyon modu</div><div class="ts">Açıkken gerçek emir gönderilmez</div></div>
+        <button class="tog on" id="togSim" onclick="this.classList.toggle('on')"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="ct">Nasıl Çalışır</div>
+    <div class="step">
+      <div class="step-n">01</div>
+      <div>
+        <div class="step-h">Bybit API Key Al</div>
+        <div class="step-p">Bybit → Hesabım → API Yönetimi → API Key Oluştur<br>
+        İzin: <code>Unified Trading</code> → <code>Spot</code> → <code>Emir Oluştur/İptal</code></div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-n">02</div>
+      <div>
+        <div class="step-h">Kaydet ve Test Et</div>
+        <div class="step-p">API Key + Secret gir → <code>Kaydet</code> → <code>Test Et</code><br>
+        Bakiye ve fee görünüyorsa bağlantı başarılı.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-n">03</div>
+      <div>
+        <div class="step-h">Triangular Arbitraj Mantığı</div>
+        <div class="step-p">Bot <code>USDT → COIN/USDT → COIN/USDC → USDC/USDT</code> döngüsünü uygular.<br>
+        Bybit'te BTCUSDT, BTCUSDC, USDCUSDT hepsi aktif — arbitraj fırsatları var.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-n">04</div>
+      <div>
+        <div class="step-h">Simülasyon → Canlı</div>
+        <div class="step-p">Önce simülasyon modunda test et, fırsatlar görünüyorsa<br>
+        simülasyonu kapat → <code>▶ Botu Başlat</code> → gerçek işlem alır.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ DASHBOARD ══ -->
+<div class="pnl" id="p-dash">
+  <div class="g4" style="margin-bottom:.875rem">
+    <div class="m"><div class="ml">Toplam Kâr</div><div class="mv g" id="mP">+0.0000</div><div style="font-size:10px;color:var(--t3)">USDT</div></div>
+    <div class="m"><div class="ml">İşlem</div><div class="mv b" id="mT">0</div></div>
+    <div class="m"><div class="ml">Başarı</div><div class="mv a" id="mR">—</div></div>
+    <div class="m"><div class="ml">Tarama</div><div class="mv c" id="mS">0</div></div>
+  </div>
+  <div class="g2" style="margin-bottom:.875rem">
+    <div class="m"><div class="ml">Aktif Rotalar</div><div class="mv" id="mRt">—</div></div>
+    <div class="m"><div class="ml">Fee (taker)</div><div class="mv" id="mF">—</div></div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.875rem">
+      <div class="ct" style="margin:0">Kârlı Fırsatlar</div>
+      <span style="font-size:10px;color:var(--t3)" id="scanLbl"></span>
+    </div>
+    <div id="oppList"><div class="empty">Bot başlatıldığında kârlı fırsatlar burada görünür...</div></div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.625rem">
+      <div class="ct" style="margin:0">Son İşlemler</div>
+      <button class="btn btn-sm" onclick="clr('tlog')">Temizle</button>
+    </div>
+    <div class="log" style="height:200px" id="tlog">
+      <div class="ll"><span class="lt">--:--:--</span><span class="li">Henüz işlem yok.</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ROTALAR ══ -->
+<div class="pnl" id="p-routes">
+  <div class="card">
+    <div class="ct">Bybit'te Aktif Triangular Rotalar</div>
+    <div id="routeList"><div class="empty">Bot başlatıldıktan sonra keşfedilen rotalar burada listelenir.</div></div>
+  </div>
+</div>
+
+<!-- ══ LOGLAR ══ -->
+<div class="pnl" id="p-logs">
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.625rem">
+      <div class="ct" style="margin:0">Sistem Logları</div>
+      <button class="btn btn-sm" onclick="clr('flog')">Temizle</button>
+    </div>
+    <div class="log" style="height:540px" id="flog">
+      <div class="ll"><span class="lt">00:00:00</span><span class="li">Hazır. API key gir ve "Test Et" butonuna bas.</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="foot">ARBXBot · Bybit V5 API · Kripto ticareti risk içerir · Yatırım tavsiyesi değildir</div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════
+let running=false, scanTimer=null;
+let profit=0, dayLoss=0, trades=0, wins=0, scans=0, openPos=0;
+let makerFee=0.001, takerFee=0.001, feeAt=0;
+let routes=[];
+
+const $  = id => document.getElementById(id);
+const ts = () => new Date().toTimeString().slice(0,8);
+const f2 = v  => parseFloat(v).toFixed(2);
+const sv = (id,v) => { const e=$(id); if(e) e.textContent=v; };
+const sl  = ms => new Promise(r=>setTimeout(r,ms));
+const SIM = () => $('togSim').classList.contains('on');
+
+function log(cls, msg, toTrade=false) {
+  const h=`<div class="ll"><span class="lt">${ts()}</span><span class="${cls}">${msg}</span></div>`;
+  const fl=$('flog'); if(fl){fl.innerHTML+=h;fl.scrollTop=fl.scrollHeight;}
+  if(toTrade){const tl=$('tlog');if(tl){tl.innerHTML+=h;tl.scrollTop=tl.scrollHeight;}}
+}
+function clr(id){const e=$(id);if(e)e.innerHTML='';}
+function setNotice(msg,cls='ninfo'){const n=$('mainNotice');n.className='notice '+cls;n.textContent=msg;}
+function tab(name,btn){
+  document.querySelectorAll('.pnl').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  $('p-'+name).classList.add('on'); if(btn)btn.classList.add('on');
+}
+
+// ══════════════════════════════════════════════════
+//  API KEYS
+// ══════════════════════════════════════════════════
+function saveKeys(){
+  const k=$('apiKey').value.trim(), s=$('secKey').value.trim();
+  if(!k||!s){setNotice('API Key ve Secret boş olamaz!','nerr');return;}
+  localStorage.setItem('bb_api',k); localStorage.setItem('bb_sec',s);
+  log('lp','✓ Anahtarlar kaydedildi');
+  setNotice('Kaydedildi. Şimdi "Bağlantıyı Test Et" butonuna bas.','nok');
+}
+function loadKeys(){
+  const k=localStorage.getItem('bb_api'),s=localStorage.getItem('bb_sec');
+  if(k)$('apiKey').value=k; if(s)$('secKey').value=s;
+}
+function keys(){
+  return{
+    apiKey:$('apiKey').value.trim()||localStorage.getItem('bb_api')||'',
+    secretKey:$('secKey').value.trim()||localStorage.getItem('bb_sec')||''
+  };
+}
+
+// ══════════════════════════════════════════════════
+//  BYBIT V5 PROXY CALL
+//  Tüm istekler /.netlify/functions/bybit üzerinden
+// ══════════════════════════════════════════════════
+async function bybit(method, path, params={}, signed=false){
+  const {apiKey,secretKey}=keys();
+  try{
+    const res=await fetch('/.netlify/functions/bybit',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({apiKey,secretKey,method,path,params,signed})
+    });
+    if(!res.ok){log('le',`HTTP ${res.status}`);return{retCode:-1,retMsg:`HTTP ${res.status}`};}
+    return res.json();
+  }catch(e){
+    log('le',`Proxy hatası: ${e.message}`);
+    return{retCode:-1,retMsg:String(e)};
+  }
+}
+
+// ══════════════════════════════════════════════════
+//  BAĞLANTI TESTİ
+// ══════════════════════════════════════════════════
+async function testConn(){
+  const {apiKey,secretKey}=keys();
+  if(!apiKey||!secretKey){setNotice('API Key girilmemiş!','nerr');return;}
+  setNotice('Test ediliyor...','ninfo');
+  log('lb','══ BYBIT V5 BAĞLANTI TESTİ ══');
+
+  // 1. Public market testi — orderbook
+  const ob=await bybit('GET','/v5/market/orderbook',{category:'spot',symbol:'BTCUSDT',limit:'1'});
+  log('li',`Orderbook: retCode=${ob.retCode} bids=${ob?.result?.b?.length||0}`);
+  if(ob.retCode!==0){
+    log('le',`Market hatası: ${ob.retMsg}`);
+    setNotice(`Market API hatası: ${ob.retMsg}`,'nerr');return;
+  }
+  log('lp','✓ Market (public) API OK');
+
+  // 2. Bakiye — UNIFIED hesap
+  const bal=await bybit('GET','/v5/account/wallet-balance',{accountType:'UNIFIED'},true);
+  log('li',`Bakiye: retCode=${bal.retCode}`);
+  if(bal.retCode!==0){
+    log('le',`Bakiye hatası: ${bal.retMsg}`);
+    setNotice(`API Key/Secret hatalı: ${bal.retMsg}`,'nerr');return;
+  }
+  const coins=bal?.result?.list?.[0]?.coin||[];
+  const usdt=parseFloat(coins.find(c=>c.coin==='USDT')?.walletBalance||0);
+  const usdc=parseFloat(coins.find(c=>c.coin==='USDC')?.walletBalance||0);
+  log('lp',`✓ Bakiye  USDT: ${usdt.toFixed(4)}  USDC: ${usdc.toFixed(4)}`);
+
+  // 3. Fee oranı
+  const feeD=await bybit('GET','/v5/account/fee-rate',{category:'spot',symbol:'BTCUSDT'},true);
+  if(feeD.retCode===0){
+    const list=feeD?.result?.list||[];
+    if(list.length){
+      takerFee=parseFloat(list[0].takerFeeRate||'0.001');
+      makerFee=parseFloat(list[0].makerFeeRate||'0.001');
+      feeAt=Date.now();
+      sv('mF',`${(takerFee*100).toFixed(3)}%`);
+      log('lp',`✓ Fee  taker=${(takerFee*100).toFixed(3)}%  maker=${(makerFee*100).toFixed(3)}%`);
+      log('li',`  3-leg toplam fee: ${(takerFee*3*100).toFixed(3)}%`);
+    }
+  }
+
+  $('sDot').className='dot on';
+  $('sTxt').textContent='Bybit Bağlı';
+  setNotice(`✓ Bybit bağlantısı OK! USDT: ${usdt.toFixed(2)} | Fee: ${(takerFee*100).toFixed(3)}% | Botu başlatabilirsin.`,'nok');
+  log('lp','══ BAĞLANTI BAŞARILI ══');
+}
+
+// ══════════════════════════════════════════════════
+//  FEE (5dk cache)
+// ══════════════════════════════════════════════════
+async function getFee(){
+  if(Date.now()-feeAt<300000) return takerFee;
+  const d=await bybit('GET','/v5/account/fee-rate',{category:'spot',symbol:'BTCUSDT'},true);
+  if(d.retCode===0&&d?.result?.list?.length){
+    takerFee=parseFloat(d.result.list[0].takerFeeRate||'0.001');
+    makerFee=parseFloat(d.result.list[0].makerFeeRate||'0.001');
+    feeAt=Date.now();
+    sv('mF',`${(takerFee*100).toFixed(3)}%`);
+    log('li',`Fee güncellendi: taker=${(takerFee*100).toFixed(3)}%`);
+  }
+  return takerFee;
+}
+
+// ══════════════════════════════════════════════════
+//  ORDER BOOK — en hızlı fiyat
+// ══════════════════════════════════════════════════
+async function getOB(symbol, limit=5){
+  const d=await bybit('GET','/v5/market/orderbook',{category:'spot',symbol,limit:String(limit)});
+  if(d.retCode!==0) return null;
+  return d.result; // {b:[[price,qty]...], a:[[price,qty]...]}
+}
+
+function bestAsk(ob){ // Alış için — en düşük satış fiyatı
+  if(!ob?.a?.length) return null;
+  return parseFloat(ob.a.reduce((mn,x)=>parseFloat(x[0])<parseFloat(mn[0])?x:mn)[0]);
+}
+function bestBid(ob){ // Satış için — en yüksek alış fiyatı
+  if(!ob?.b?.length) return null;
+  return parseFloat(ob.b.reduce((mx,x)=>parseFloat(x[0])>parseFloat(mx[0])?x:mx)[0]);
+}
+
+// ══════════════════════════════════════════════════
+//  AKTİF PARİTELERİ KEŞFEDELİM (Bybit V5)
+//  Bybit'te COIN/USDT ve COIN/USDC çiftleri VAR
+// ══════════════════════════════════════════════════
+async function discoverRoutes(){
+  log('lb','Bybit aktif spot pariteleri keşfediliyor...');
+
+  const d=await bybit('GET','/v5/market/instruments-info',{category:'spot',limit:'500'});
+  if(d.retCode!==0){log('le',`Sembol listesi hatası: ${d.retMsg}`);return[];}
+
+  const symbols=d?.result?.list||[];
+  log('li',`${symbols.length} spot sembol bulundu`);
+
+  // Aktif USDT çiftleri
+  const usdtSet=new Set();
+  symbols.forEach(s=>{
+    if(s.quoteCoin==='USDT'&&s.status==='Trading') usdtSet.add(s.baseCoin);
+  });
+
+  // Aktif USDC çiftleri
+  const usdcSet=new Set();
+  symbols.forEach(s=>{
+    if(s.quoteCoin==='USDC'&&s.status==='Trading') usdcSet.add(s.baseCoin);
+  });
+
+  // USDC-USDT çifti var mı?
+  const hasUsdcUsdt=symbols.some(s=>s.symbol==='USDCUSDT'&&s.status==='Trading');
+  log(hasUsdcUsdt?'lp':'lw',`USDCUSDT çifti: ${hasUsdcUsdt?'✓ Mevcut':'✗ Yok'}`);
+
+  // TRİANGULAR ROTALAR: USDT → COIN → USDC → USDT
+  const routes=[];
+  if(hasUsdcUsdt){
+    for(const coin of usdtSet){
+      if(usdcSet.has(coin)){
+        routes.push({
+          type:'TRI',
+          label:`USDT → ${coin}USDT → ${coin}USDC → USDCUSDT`,
+          sym1:`${coin}USDT`,   // BUY coin with USDT
+          sym2:`${coin}USDC`,   // SELL coin for USDC
+          sym3:'USDCUSDT',      // SELL USDC for USDT
+          coin
+        });
+      }
+    }
+  }
+
+  // Ek: USDT → BTC → COIN → USDT (BTC triangular)
+  const btcSet=new Set();
+  symbols.forEach(s=>{
+    if(s.quoteCoin==='BTC'&&s.status==='Trading') btcSet.add(s.baseCoin);
+  });
+  const hasBtcUsdt=usdtSet.has('BTC');
+  if(hasBtcUsdt){
+    let btcCount=0;
+    for(const coin of btcSet){
+      if(usdtSet.has(coin)&&coin!=='BTC'){
+        routes.push({
+          type:'TRI_BTC',
+          label:`USDT → BTCUSDT → ${coin}BTC → ${coin}USDT`,
+          sym1:'BTCUSDT',     // BUY BTC
+          sym2:`${coin}BTC`,  // BUY coin with BTC
+          sym3:`${coin}USDT`, // SELL coin for USDT
+          coin:'BTC',midCoin:coin
+        });
+        btcCount++;
+        if(btcCount>=15) break;
+      }
+    }
+    log(btcCount>0?'lp':'lw',`BTC triangular rotalar: ${btcCount}`);
+  }
+
+  const triCount=routes.filter(r=>r.type==='TRI').length;
+  log('lp',`✓ USDC triangular rotalar: ${triCount}`);
+  log('lp',`✓ Toplam ${routes.length} rota keşfedildi`);
+  return routes;
+}
+
+// ══════════════════════════════════════════════════
+//  KÂR HESABI — FEE DAHİL, KARSIZSA NULL
+// ══════════════════════════════════════════════════
+async function calcOpp(route, amt, fee){
+  let ob1,ob2,ob3;
+  try{
+    [ob1,ob2,ob3]=await Promise.all([getOB(route.sym1),getOB(route.sym2),getOB(route.sym3)]);
+  }catch{return null;}
+  if(!ob1||!ob2||!ob3) return null;
+
+  if(route.type==='TRI'){
+    // USDT → COIN → USDC → USDT
+    const ask1=bestAsk(ob1); // coin/usdt ask — COIN almak için
+    const bid2=bestBid(ob2); // coin/usdc bid — COIN satmak için
+    const bid3=bestBid(ob3); // usdc/usdt bid — USDC satmak için
+    if(!ask1||!bid2||!bid3) return null;
+
+    const coinsRaw=amt/ask1, coins=coinsRaw*(1-fee), fee1=coinsRaw*fee*ask1;
+    const usdcRaw=coins*bid2, usdc=usdcRaw*(1-fee), fee2=usdcRaw*fee;
+    const usdtRaw=usdc*bid3, usdtOut=usdtRaw*(1-fee), fee3=usdtRaw*fee;
+
+    const totalFee=fee1+fee2+fee3;
+    const net=usdtOut-amt, pct=(net/amt)*100;
+    if(net<=0) return null;
+    return{route,ask1,bid2,bid3,coins,usdc,usdtOut,net,pct,totalFee,fee,amt};
+
+  }else if(route.type==='TRI_BTC'){
+    // USDT → BTC → COIN → USDT
+    const ask1=bestAsk(ob1); // btc/usdt ask
+    const ask2=bestAsk(ob2); // coin/btc ask
+    const bid3=bestBid(ob3); // coin/usdt bid
+    if(!ask1||!ask2||!bid3) return null;
+
+    const btcRaw=amt/ask1, btc=btcRaw*(1-fee), fee1=btcRaw*fee*ask1;
+    const coinRaw=btc/ask2, coin=coinRaw*(1-fee), fee2=coinRaw*fee*ask2;
+    const usdtRaw=coin*bid3, usdtOut=usdtRaw*(1-fee), fee3=usdtRaw*fee;
+
+    const totalFee=fee1+fee2+fee3;
+    const net=usdtOut-amt, pct=(net/amt)*100;
+    if(net<=0) return null;
+    return{route,ask1,ask2,bid3,btc,coin,usdtOut,net,pct,totalFee,fee,amt};
+  }
+  return null;
+}
+
+// ══════════════════════════════════════════════════
+//  EMİR GÖNDERME — BYBIT V5 GERÇEK API
+// ══════════════════════════════════════════════════
+
+// Market BUY — qty: coin miktarı veya marketUnit ile USDT miktar
+async function buyMarket(symbol, qty, isQuote=false){
+  const logMsg=isQuote
+    ?`  ▶ BUY  ${symbol}  ${qty} USDT (quote)`
+    :`  ▶ BUY  ${symbol}  ${qty} qty`;
+  log('li',logMsg);
+
+  if(SIM()){
+    // Simülasyon: tahmini fiyat hesapla
+    const ob=await getOB(symbol,1);
+    const p=bestAsk(ob)||1;
+    const approx=isQuote?qty/p:qty;
+    log('lw',`    [SIM] ~${approx.toFixed(8)}`);
+    return{retCode:0,sim:true,approxQty:approx,result:{orderId:'SIM'+Date.now()}};
+  }
+
+  // CANLI — Bybit V5 gerçek emir
+  const params={
+    category:'spot',
+    symbol,
+    side:'Buy',
+    orderType:'Market',
+  };
+  if(isQuote){
+    // USDT miktarıyla al — marketUnit=quoteCoin
+    params.qty=String(qty);
+    params.marketUnit='quoteCoin';
+  }else{
+    params.qty=String(qty);
+  }
+
+  const r=await bybit('POST','/v5/order/create',params,true);
+  if(r.retCode!==0) log('le',`  BUY hata: ${r.retCode} ${r.retMsg}`);
+  else log('lp',`  BUY OK orderId=${r?.result?.orderId}`);
+  return r;
+}
+
+async function sellMarket(symbol, qty){
+  log('li',`  ▶ SELL ${symbol}  ${qty}`);
+
+  if(SIM()){
+    const ob=await getOB(symbol,1);
+    const p=bestBid(ob)||1;
+    const approx=qty*p;
+    log('lw',`    [SIM] ~${approx.toFixed(6)}`);
+    return{retCode:0,sim:true,approxQuote:approx,result:{orderId:'SIM'+Date.now()}};
+  }
+
+  const r=await bybit('POST','/v5/order/create',{
+    category:'spot',
+    symbol,
+    side:'Sell',
+    orderType:'Market',
+    qty:String(qty),
+  },true);
+  if(r.retCode!==0) log('le',`  SELL hata: ${r.retCode} ${r.retMsg}`);
+  else log('lp',`  SELL OK orderId=${r?.result?.orderId}`);
+  return r;
+}
+
+// Bybit'te market emir genellikle anında dolar, kısa bekle
+async function waitFill(symbol, orderId, tries=6){
+  for(let i=0;i<tries;i++){
+    await sl(400);
+    const d=await bybit('GET','/v5/order/realtime',{category:'spot',orderId},true);
+    const o=d?.result?.list?.[0];
+    if(o&&['Filled','PartiallyFilled'].includes(o.orderStatus)) return o;
+  }
+  return null;
+}
+
+// ══════════════════════════════════════════════════
+//  3 LEG OTOMATİK YÜRÜTME
+// ══════════════════════════════════════════════════
+async function execute(opp){
+  const sim=SIM(), tag=sim?'[SIM]':'[LIVE]';
+  const r=opp.route;
+  log('lb',`${tag} ${r.label}`,true);
+  log('lb',`  Net: +${opp.net.toFixed(5)} USDT (${opp.pct.toFixed(4)}%)  Fee: ${opp.totalFee.toFixed(5)} USDT`,true);
+
+  // Bakiye kontrolü
+  if(!sim){
+    const bal=await bybit('GET','/v5/account/wallet-balance',{accountType:'UNIFIED'},true);
+    const coins=bal?.result?.list?.[0]?.coin||[];
+    const avail=parseFloat(coins.find(c=>c.coin==='USDT')?.availableToWithdraw||0);
+    if(avail<opp.amt){
+      log('le',`  ✗ Yetersiz bakiye: ${avail.toFixed(2)} USDT`,true);
+      return{ok:false,net:0};
+    }
+    log('li',`  Bakiye: ${avail.toFixed(2)} USDT ✓`);
+  }
+
+  if(r.type==='TRI'){
+    // ── LEG 1: USDT → COIN ──────────────────────
+    const r1=await buyMarket(r.sym1,opp.amt,true); // quote=USDT
+    if(r1.retCode!==0){log('le','  ✗ LEG1 başarısız',true);return{ok:false,net:0};}
+    let coins;
+    if(sim){ coins=r1.approxQty||opp.coins; }
+    else{
+      await sl(500);
+      const f1=await waitFill(r.sym1,r1.result.orderId);
+      coins=parseFloat(f1?.cumExecQty||0);
+      if(coins<=0){log('le','  ✗ LEG1 fill=0',true);return{ok:false,net:0};}
+    }
+    log('lp',`  ✓ LEG1 → ${coins.toFixed(8)} ${r.coin}`,true);
+
+    // ── LEG 2: COIN → USDC ──────────────────────
+    const qty2=Math.floor(coins*1e6)/1e6; // precision
+    const r2=await sellMarket(r.sym2,qty2);
+    if(r2.retCode!==0){
+      log('le','  ✗ LEG2 başarısız',true);
+      if(!sim) log('lw',`  ⚠ ${coins.toFixed(8)} ${r.coin} elde kaldı! ${r.sym2} üzerinden sat.`,true);
+      return{ok:false,net:0};
+    }
+    let usdc;
+    if(sim){ usdc=r2.approxQuote||opp.usdc; }
+    else{
+      await sl(500);
+      const f2=await waitFill(r.sym2,r2.result.orderId);
+      usdc=parseFloat(f2?.cumExecValue||0);
+      if(usdc<=0){
+        log('le','  ✗ LEG2 fill=0',true);
+        if(!sim) log('lw',`  ⚠ ${coins.toFixed(8)} ${r.coin} elde kaldı!`,true);
+        return{ok:false,net:0};
+      }
+    }
+    log('lp',`  ✓ LEG2 → ${usdc.toFixed(6)} USDC`,true);
+
+    // ── LEG 3: USDC → USDT ──────────────────────
+    const qty3=Math.floor(usdc*1e4)/1e4;
+    const r3=await sellMarket(r.sym3,qty3);
+    if(r3.retCode!==0){
+      log('le','  ✗ LEG3 başarısız',true);
+      if(!sim) log('lw',`  ⚠ ${usdc.toFixed(6)} USDC elde kaldı! USDCUSDT üzerinden sat.`,true);
+      return{ok:false,net:0};
+    }
+    let usdtFinal;
+    if(sim){ usdtFinal=r3.approxQuote||opp.usdtOut; }
+    else{
+      await sl(500);
+      const f3=await waitFill(r.sym3,r3.result.orderId);
+      usdtFinal=parseFloat(f3?.cumExecValue||opp.usdtOut);
+    }
+
+    const net=usdtFinal-opp.amt, pct=(net/opp.amt)*100;
+    const cl=net>=0?'lp':'le';
+    log('lp',`  ✓ LEG3 → ${usdtFinal.toFixed(6)} USDT`,true);
+    log(cl,`  ══ NET: ${net>=0?'+':''}${net.toFixed(5)} USDT (${pct>=0?'+':''}${pct.toFixed(4)}%) ══`,true);
+    return{ok:true,net};
+
+  }else if(r.type==='TRI_BTC'){
+    // ── LEG 1: USDT → BTC ───────────────────────
+    const r1=await buyMarket(r.sym1,opp.amt,true);
+    if(r1.retCode!==0){log('le','  ✗ LEG1 başarısız',true);return{ok:false,net:0};}
+    let btc;
+    if(sim){ btc=r1.approxQty||opp.btc; }
+    else{
+      await sl(500);
+      const f1=await waitFill(r.sym1,r1.result.orderId);
+      btc=parseFloat(f1?.cumExecQty||0);
+      if(btc<=0){log('le','  ✗ LEG1 fill=0',true);return{ok:false,net:0};}
+    }
+    log('lp',`  ✓ LEG1 → ${btc.toFixed(8)} BTC`,true);
+
+    // ── LEG 2: BTC → COIN ───────────────────────
+    const qty2b=Math.floor(btc*1e6)/1e6;
+    const r2=await buyMarket(r.sym2,qty2b,false); // qty=BTC miktarı (quote)
+    if(r2.retCode!==0){
+      log('le','  ✗ LEG2 başarısız',true);
+      if(!sim) log('lw',`  ⚠ ${btc.toFixed(8)} BTC elde kaldı!`,true);
+      return{ok:false,net:0};
+    }
+    let midCoin;
+    if(sim){ midCoin=r2.approxQty||opp.coin; }
+    else{
+      await sl(500);
+      const f2=await waitFill(r.sym2,r2.result.orderId);
+      midCoin=parseFloat(f2?.cumExecQty||0);
+      if(midCoin<=0){log('le','  ✗ LEG2 fill=0',true);return{ok:false,net:0};}
+    }
+    log('lp',`  ✓ LEG2 → ${midCoin.toFixed(8)} ${r.midCoin}`,true);
+
+    // ── LEG 3: COIN → USDT ──────────────────────
+    const qty3b=Math.floor(midCoin*1e6)/1e6;
+    const r3=await sellMarket(r.sym3,qty3b);
+    if(r3.retCode!==0){
+      log('le','  ✗ LEG3 başarısız',true);
+      if(!sim) log('lw',`  ⚠ ${midCoin.toFixed(8)} ${r.midCoin} elde kaldı!`,true);
+      return{ok:false,net:0};
+    }
+    let usdtFinal;
+    if(sim){ usdtFinal=r3.approxQuote||opp.usdtOut; }
+    else{
+      await sl(500);
+      const f3=await waitFill(r.sym3,r3.result.orderId);
+      usdtFinal=parseFloat(f3?.cumExecValue||opp.usdtOut);
+    }
+
+    const net=usdtFinal-opp.amt, pct=(net/opp.amt)*100;
+    const cl=net>=0?'lp':'le';
+    log('lp',`  ✓ LEG3 → ${usdtFinal.toFixed(6)} USDT`,true);
+    log(cl,`  ══ NET: ${net>=0?'+':''}${net.toFixed(5)} USDT (${pct>=0?'+':''}${pct.toFixed(4)}%) ══`,true);
+    return{ok:true,net};
+  }
+
+  return{ok:false,net:0};
+}
+
+// ══════════════════════════════════════════════════
+//  ANA TARAMA DÖNGÜSÜ
+// ══════════════════════════════════════════════════
+async function scan(){
+  if(!running) return;
+  scans++;
+  sv('mS',scans.toLocaleString());
+  sv('scanLbl',`#${scans} · ${routes.length} rota`);
+
+  const curFee=await getFee();
+  const amt=parseFloat($('rAmt').value);
+  const minPct=parseFloat($('rMin').value);
+
+  if(routes.length===0){
+    log('lw','Rota yok, keşfediliyor...');
+    routes=await discoverRoutes();
+    sv('mRt',routes.length);
+    renderRoutes();
+    if(routes.length===0){log('le','Hiç rota bulunamadı!');stopBot();return;}
+    return;
+  }
+
+  log('li',`Tarama #${scans} — ${routes.length} rota · fee=${(curFee*100).toFixed(3)}% · min=${minPct}%`);
+
+  // Tüm rotaları paralel hesapla
+  const results=await Promise.all(routes.map(r=>calcOpp(r,amt,curFee).catch(()=>null)));
+  const opps=results.filter(o=>o&&o.pct>=minPct).sort((a,b)=>b.net-a.net);
+
+  const ol=$('oppList');
+  if(!opps.length){
+    ol.innerHTML=`<div class="empty">Tarama #${scans} tamamlandı — ${routes.length} rotada kârlı fırsat yok<br><small>Min eşik: ${minPct}% | 3-leg fee: ${(curFee*3*100).toFixed(3)}%</small></div>`;
+    log('li',`  → Kârlı fırsat yok`);
+  }else{
+    ol.innerHTML=opps.slice(0,8).map(o=>`
+      <div class="opp">
+        <div style="flex:1">
+          <div class="op-path">${o.route.label}</div>
+          <div class="op-meta">
+            ${o.route.type==='TRI'
+              ?`ask1=${o.ask1.toFixed(5)} · bid2=${o.bid2.toFixed(5)} · bid3=${o.bid3.toFixed(6)}`
+              :`ask1=${o.ask1.toFixed(2)} · ask2=${o.ask2?.toFixed(8)||'?'} · bid3=${o.bid3?.toFixed(5)||'?'}`}
+            · fee=${o.totalFee.toFixed(5)} USDT
+          </div>
+          <div class="op-bar"><div class="op-fill" style="width:${Math.min(o.pct*70,100)}%"></div></div>
+        </div>
+        <div style="text-align:right;margin-left:12px">
+          <div class="op-pct">+${o.pct.toFixed(4)}%</div>
+          <div class="op-usdt">+${o.net.toFixed(5)} USDT</div>
+        </div>
+      </div>`).join('');
+    log('lp',`  → ${opps.length} fırsat! En iyi: ${opps[0].route.coin||opps[0].route.midCoin} +${opps[0].pct.toFixed(4)}%`);
+
+    // En iyi fırsata OTOMATIK GİR
+    if(openPos<1){
+      const best=opps[0];
+      openPos++;
+      try{
+        const{ok,net}=await execute(best);
+        trades++;
+        if(ok){wins++;profit+=net;if(net<0)dayLoss+=Math.abs(net);}
+        else{const loss=best.amt*curFee*3;dayLoss+=loss;profit-=loss;}
+        updateM();
+        const maxLoss=parseFloat($('rLoss').value);
+        if(dayLoss>=maxLoss){log('le',`⛔ Günlük zarar limiti ${maxLoss} USDT aşıldı!`,true);stopBot();}
+      }finally{openPos--;}
+    }
+  }
+}
+
+function updateM(){
+  const e=$('mP');
+  e.textContent=(profit>=0?'+':'')+profit.toFixed(4);
+  e.className='mv '+(profit>=0?'g':'r');
+  sv('mT',trades);
+  sv('mR',trades?Math.round(wins/trades*100)+'%':'—');
+}
+
+function renderRoutes(){
+  const rl=$('routeList');
+  if(!routes.length){rl.innerHTML='<div class="empty">Rota bulunamadı.</div>';return;}
+  const triCount=routes.filter(r=>r.type==='TRI').length;
+  const btcCount=routes.filter(r=>r.type==='TRI_BTC').length;
+  rl.innerHTML=`<div style="font-size:11px;color:var(--t2);margin-bottom:.75rem;padding:.5rem .75rem;background:var(--bg3);border-radius:var(--r)">
+    USDC triangular: ${triCount} · BTC triangular: ${btcCount} · Toplam: ${routes.length}
+  </div>`+routes.map(r=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;
+         padding:.45rem .75rem;border-bottom:1px solid var(--b);font-size:11px">
+      <span style="color:var(--t2)">${r.label}</span>
+      <span style="padding:2px 8px;border-radius:4px;font-size:10px;font-weight:500;
+            background:${r.type==='TRI'?'rgba(0,230,118,.12)':'rgba(77,159,255,.12)'};
+            color:${r.type==='TRI'?'var(--green)':'var(--blue)'}">${r.type}</span>
+    </div>`).join('');
+}
+
+// ══════════════════════════════════════════════════
+//  BOT KONTROL
+// ══════════════════════════════════════════════════
+function toggleBot(){running?stopBot():startBot();}
+
+async function startBot(){
+  const{apiKey,secretKey}=keys();
+  if(!apiKey||!secretKey){setNotice('API key girilmemiş!','nerr');log('le','API key yok!');return;}
+
+  running=true; dayLoss=0; profit=0; trades=0; wins=0; scans=0;
+  $('sDot').className='dot on';
+  $('sTxt').textContent=SIM()?'Simülasyon':'Bybit Canlı';
+  $('mainBtn').className='btn btn-stop';
+  $('mainBtn').textContent='■ Durdur';
+  const sim=SIM();
+  log('lb',`════ BYBIT BOT BAŞLADI — ${sim?'SİMÜLASYON':'CANLI GERÇEK İŞLEM'} ════`);
+  log('li',`Miktar: ${$('rAmt').value} USDT  Min kâr: ${$('rMin').value}%  Hız: ${$('rSpd').value}ms`);
+  if(!sim) log('lw','⚠ CANLI MOD — Gerçek Bybit emri gönderiliyor!',true);
+
+  // Rotaları keşfet
+  routes=await discoverRoutes();
+  sv('mRt',routes.length);
+  renderRoutes();
+
+  if(routes.length===0){
+    log('le','Hiç rota bulunamadı! Bağlantı durumunu kontrol et.');
+    stopBot(); return;
+  }
+  log('lp',`${routes.length} rota hazır, tarama başlıyor...`);
+
+  // Dashboard'a geç
+  tab('dash',document.querySelectorAll('.tab')[1]);
+  await scan();
+  const spd=parseInt($('rSpd').value);
+  scanTimer=setInterval(scan,spd);
+}
+
+function stopBot(){
+  running=false; clearInterval(scanTimer);
+  $('sDot').className='dot';
+  $('sTxt').textContent='Durduruldu';
+  $('mainBtn').className='btn btn-go';
+  $('mainBtn').textContent='▶ Botu Başlat';
+  $('oppList').innerHTML='<div class="empty">Bot durduruldu.</div>';
+  log('lw','════ BOT DURDURULDU ════');
+}
+
+loadKeys();
+</script>
+</body>
+</html>
